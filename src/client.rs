@@ -4,7 +4,6 @@ use server::Server;
 use sodiumoxide::base64::*;
 use sodiumoxide::crypto::*;
 
-
 pub struct Client {
     master_password: String,
 }
@@ -71,7 +70,8 @@ impl Client {
 
         let mut my_decrypted_filenames: Vec<String> = Vec::new();
 
-        for encrypted_filename in &my_metadata.encrypted_filenames { // this is really badly optimised, as key, nonce and salt have to be retrieved each time
+        for encrypted_filename in &my_metadata.encrypted_filenames {
+            // this is really badly optimised, as key, nonce and salt have to be retrieved each time
             my_decrypted_filenames.push(self.decrypt_stuff(
                 encrypted_filename,
                 my_metadata.user_salt.as_str(),
@@ -115,12 +115,12 @@ impl Client {
             .repeat_msg(message)
             .err(format!(
                 "Please enter a number in the range [1:{}].",
-                (i-1)
+                (i - 1)
             ))
-            .add_test(move |x| *x <= (i-1) && *x != 0)
+            .add_test(move |x| *x <= (i - 1) && *x != 0)
             .get();
 
-        choice-1 // :)
+        choice - 1 // :)
     }
 
     pub fn entrypoint() -> () {

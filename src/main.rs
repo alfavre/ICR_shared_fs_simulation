@@ -5,17 +5,17 @@ mod server;
 mod vault;
 use read_input::prelude::*;
 
-
-use vault::Vault;
 use client::Client;
+use vault::Vault;
 
 fn main() {
-    let my_s : String = input()
-    .repeat_msg("Do you want to initialize/reinitialize the database?\n[y/n]: ")
-    .add_test(|x| *x == "yes" || *x == "y" || *x == "no" || *x == "n")
-    .get();
-    
-    match my_s.as_str(){
+
+    let my_s: String = input()
+        .repeat_msg("Do you want to initialize/reinitialize the database?\n[y/n]: ")
+        .add_test(|x| *x == "yes" || *x == "y" || *x == "no" || *x == "n")
+        .get();
+
+    match my_s.as_str() {
         "yes" | "y" => Vault::create_default_db(),
         "no" | "n" => (),
         _ => panic!("an unexpected answer was given."),

@@ -1,10 +1,9 @@
 use super::*;
 use file_n_metadata::{EncryptedFile, MetaData};
 use sodiumoxide::base64::*;
+use sodiumoxide::crypto::*;
 use sodiumoxide::randombytes::randombytes;
 use std::io::{Error, ErrorKind};
-use sodiumoxide::crypto::*;
-
 
 use vault::Vault;
 

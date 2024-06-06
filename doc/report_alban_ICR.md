@@ -1,4 +1,4 @@
-# Report Lab 2 CAA Encrypted Vault
+# Report min project ICR Encrypted File System
 
 ## Author
 

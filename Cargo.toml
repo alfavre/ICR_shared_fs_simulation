@@ -1,5 +1,5 @@
 [package]
-name = "caa_encrypted_vault"
+name = "icr_encrypted_filesystem"
 version = "0.1.0"
 authors = ["alban_favre <fav.alban2@gmail.com>"]
 edition = "2018"

@@ -243,14 +243,10 @@ impl Vault {
         let my_file_nonce_4 = secretbox::gen_nonce();
 
         // we need a xsalsa key for each file
-        let my_file_key_xsalsa_1 =
-            secretbox::Key::from_slice(my_file_key_1).unwrap();
-        let my_file_key_xsalsa_2 =
-            secretbox::Key::from_slice(my_file_key_2).unwrap();
-        let my_file_key_xsalsa_3 =
-            secretbox::Key::from_slice(my_file_key_3).unwrap();
-        let my_file_key_xsalsa_4 =
-            secretbox::Key::from_slice(my_file_key_4).unwrap();
+        let my_file_key_xsalsa_1 = secretbox::Key::from_slice(my_file_key_1).unwrap();
+        let my_file_key_xsalsa_2 = secretbox::Key::from_slice(my_file_key_2).unwrap();
+        let my_file_key_xsalsa_3 = secretbox::Key::from_slice(my_file_key_3).unwrap();
+        let my_file_key_xsalsa_4 = secretbox::Key::from_slice(my_file_key_4).unwrap();
 
         // we encrypt the file data
         let my_test_file_bytes_1: &[u8] = constant::TEST_DATA_TO_ENCRYPT.as_bytes(); // those weird casts are a sight to behold
