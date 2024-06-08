@@ -18,8 +18,8 @@ pub struct UserEncryptedFolder {
     pub owner: String, // username, is not private, to identify the folder alban:/home/alban
     pub is_currently_shared: bool, // tells if this folder is currently shared
 
-
     pub encrypted_folder_key: String, // encrypted with the given nonce and from the derived key from the given salt
+ 
     pub encrypted_folder_names_hash: Vec<String>, // encrypted with the given nonce and from the derived key from the given salt
     pub encrypted_folder_names: Vec<String>, // encrypted with the given nonce and from the derived key from the given salt
     pub encrypted_file_names_hash: Vec<String>, // encrypted with the given nonce and from the derived key from the given salt
@@ -39,9 +39,9 @@ pub struct UserMetaData {
     pub encrypted_root_name_hash: String, // those are encrypted with the given nonce and from the derived key from the given salt
     pub encrypted_root_name: String, // those are encrypted with the given nonce and from the derived key from the given salt
 
-    pub encrypted_shared_folder_owner: Vec<String>, // asym, to get salt and nonce, also part of name in this context
-    pub encrypted_shared_folder_names: Vec<String>, // asym, to get the ENCRYPTED file name, needs to be decrypted with the shared key
-    pub encrypted_shared_folder_keys: Vec<String>,  // asym, the sharer folder key
+    pub shared_folder_owner: Vec<String>, // asym, to get salt and nonce, also part of name in this context
+    pub encrypted_shared_folder_names: Vec<(String,String)>, // asym, to get the ENCRYPTED file name, needs to be decrypted with the shared key
+    pub encrypted_shared_folder_keys: Vec<(String,String)>,  // asym, the sharer folder key
     pub shared_folder_names_hash: Vec<String>,      // to identify folder
 
     pub master_salt: String,     // used to derive master key

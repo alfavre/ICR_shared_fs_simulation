@@ -6,6 +6,11 @@
 Alban Favre
 ```
 
+### TRUCS
+
+tentative d'eviter le leak de donnée lors ce qu'un mauvais nom d'utilsateur est donnée
+decrypt asym minimum data to avoid losing too much time
+
 ### Design
 
 Important: At no time and no circumstances should the server ever be aware of:

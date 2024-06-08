@@ -51,7 +51,7 @@ impl Vault {
             return shared_secret_vec;
         }
     */
-    pub fn retrieve_public_key_for(&self, user_name: String) -> Result<String, &str> {
+    pub fn retrieve_public_key_for(&self, user_name: &str) -> Result<String, &str> {
         match self
             .metadata_vec
             .iter()
@@ -62,7 +62,7 @@ impl Vault {
         }
     }
 
-    pub fn retrieve_salt_for(&self, user_name: String) -> Result<String, &str> {
+    pub fn retrieve_salt_for(&self, user_name: &str) -> Result<String, &str> {
         match self
             .metadata_vec
             .iter()
@@ -74,15 +74,23 @@ impl Vault {
     }
 
     /// as we never change the content, we should never have pbs
-    pub fn retrieve_metadata_by_index_value(&self, index: usize) -> Result<&UserMetaData, Error> {
-        match self.metadata_vec.get(index) {
-            Some(metad) => Ok(metad),
-            None => Err(Error::new(ErrorKind::Other, format!("Out of bound"))),
+    pub fn retrieve_metadata_for(&self, username: &str) -> Result<&UserMetaData, &str> {
+        match self
+            .metadata_vec
+            .iter()
+            .find(|metadata| metadata.user_name == username)
+        {
+            Some(metadata) => Ok(metadata),
+            None => Err("User not found."),
         }
+
     }
 
     /// as we never change the content, we should never have pbs
-    pub fn retrieve_enc_file_by_b64_hash(&self, b64_hash: &str) -> Result<&UserEncryptedFile, Error> {
+    pub fn retrieve_enc_file_by_b64_hash(
+        &self,
+        b64_hash: &str,
+    ) -> Result<&UserEncryptedFile, Error> {
         match self
             .encrypted_files_vec
             .iter()
@@ -305,7 +313,7 @@ impl Vault {
 
             encrypted_shared_folder_keys: Vec::new(),
             encrypted_shared_folder_names: Vec::new(),
-            encrypted_shared_folder_owner: Vec::new(),
+            shared_folder_owner: Vec::new(),
             shared_folder_names_hash: Vec::new(),
 
             master_salt: encode(alban_salt, Variant::UrlSafe),
@@ -321,7 +329,7 @@ impl Vault {
 
             encrypted_shared_folder_keys: Vec::new(),
             encrypted_shared_folder_names: Vec::new(),
-            encrypted_shared_folder_owner: Vec::new(),
+            shared_folder_owner: Vec::new(),
             shared_folder_names_hash: Vec::new(),
 
             master_salt: encode(zalban_salt, Variant::UrlSafe),
@@ -801,12 +809,11 @@ mod tests {
             .unwrap();
 
         let decoded_enc_root_name = decode(ct_root_name, Variant::UrlSafe).unwrap();
-        let my_deciphered_root_name =
-        String::from_utf8(secretbox::open(&decoded_enc_root_name, &my_nonce, &a_master_key).unwrap()).unwrap();
-            assert_eq!(
-                my_deciphered_root_name,
-                constant::TEST_NAME_TO_ENCRYPT_A
-            );
+        let my_deciphered_root_name = String::from_utf8(
+            secretbox::open(&decoded_enc_root_name, &my_nonce, &a_master_key).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(my_deciphered_root_name, constant::TEST_NAME_TO_ENCRYPT_A);
 
         assert_eq!(
             root_folder.encrypted_folder_names.len(),
@@ -831,35 +838,38 @@ mod tests {
             root_folder.encrypted_file_names_hash.len(),
             "folder hashes and folder nonces are not the same size"
         );
-        let a_key_decoded_nonce = decode(&root_folder.folder_key_nonce,Variant::UrlSafe).unwrap();
+        let a_key_decoded_nonce = decode(&root_folder.folder_key_nonce, Variant::UrlSafe).unwrap();
         let a_key_nonce = secretbox::Nonce::from_slice(&a_key_decoded_nonce).unwrap();
 
-        let a_key_decoded = decode(&root_folder.encrypted_folder_key,Variant::UrlSafe).unwrap();
-        let a_key_deciphered = secretbox::open(&a_key_decoded, &a_key_nonce, &a_master_key).unwrap();
+        let a_key_decoded = decode(&root_folder.encrypted_folder_key, Variant::UrlSafe).unwrap();
+        let a_key_deciphered =
+            secretbox::open(&a_key_decoded, &a_key_nonce, &a_master_key).unwrap();
         let a_key = secretbox::Key::from_slice(&a_key_deciphered).unwrap();
 
         let mut my_deciphered_test_filename_vec: Vec<String> = Vec::new();
-        for i in 0..root_folder.file_name_nonces.len(){
-            let decoded_enc_name = decode(root_folder.encrypted_file_names[i].clone(), Variant::UrlSafe).unwrap();
-            let my_nonce_slice = decode(root_folder.file_name_nonces[i].clone(),Variant::UrlSafe).unwrap();
-            let nonce=secretbox::Nonce::from_slice(&my_nonce_slice).unwrap();
-            
+        for i in 0..root_folder.file_name_nonces.len() {
+            let decoded_enc_name = decode(
+                root_folder.encrypted_file_names[i].clone(),
+                Variant::UrlSafe,
+            )
+            .unwrap();
+            let my_nonce_slice =
+                decode(root_folder.file_name_nonces[i].clone(), Variant::UrlSafe).unwrap();
+            let nonce = secretbox::Nonce::from_slice(&my_nonce_slice).unwrap();
+
             //wrong key, need real root key
-            
+
             let my_deciphered_test_filename =
                 secretbox::open(&decoded_enc_name, &nonce, &a_key).unwrap();
-                my_deciphered_test_filename_vec.push(String::from_utf8(my_deciphered_test_filename).unwrap());
+            my_deciphered_test_filename_vec
+                .push(String::from_utf8(my_deciphered_test_filename).unwrap());
         }
-        assert_eq!(
-            my_deciphered_test_filename_vec.len(),
-            1
-        );
+        assert_eq!(my_deciphered_test_filename_vec.len(), 1);
 
         assert_eq!(
             my_deciphered_test_filename_vec[0],
             constant::TEST_NAME_TO_ENCRYPT_D
         );
-
     }
     /*
     #[test]
