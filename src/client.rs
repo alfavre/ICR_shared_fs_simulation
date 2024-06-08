@@ -142,7 +142,7 @@ impl Client {
             .unwrap()
     }
 
-    pub fn to_sym_key(slice_key:&[u8;32]) -> secretbox::Key {
+    pub fn to_sym_key(slice_key: &[u8; 32]) -> secretbox::Key {
         return secretbox::Key::from_slice(slice_key).unwrap();
     }
 
@@ -258,7 +258,7 @@ impl Client {
                 false,
             );
 
-            if (!is_folder) {
+            if !is_folder {
                 panic!("imposible choice!");
             }
             let owner_pk = server.ask_for_public_key(my_mt.shared_folder_owner[index].as_str());
@@ -273,6 +273,8 @@ impl Client {
             // we load root
             let root_name_hash = my_mt.encrypted_root_name_hash.clone();
             let root_folder = server.ask_for_folder(root_name_hash.as_str());
+            
+            
             let my_decrypted_root_key = self.decipher_sym_key(
                 root_folder.encrypted_folder_key.as_str(),
                 root_folder.folder_key_nonce.as_str(),
@@ -312,8 +314,12 @@ impl Client {
     ) {
         let my_folder = server.ask_for_folder(folder_hash);
         loop {
-            let file_name_vec: Vec<String> = Vec::new();
-            let folder_name_vec: Vec<String> = Vec::new();
+
+            println!("");
+            println!("");
+
+            let mut file_name_vec: Vec<String> = Vec::new();
+            let mut folder_name_vec: Vec<String> = Vec::new();
 
             for i in 0..my_folder.encrypted_file_names.len() {
                 let deciphered_file_name = self.decipher_sym_text(
@@ -321,7 +327,8 @@ impl Client {
                     my_folder.file_name_nonces[i].as_str(),
                     folder_key,
                 );
-                file_name_vec.push(deciphered_file_name);
+                let result = format!("{}:{}", my_folder.owner, deciphered_file_name);
+                file_name_vec.push(result);
             }
             for i in 0..my_folder.encrypted_folder_names.len() {
                 let deciphered_folder_name = self.decipher_sym_text(
@@ -329,32 +336,59 @@ impl Client {
                     my_folder.folder_name_nonces[i].as_str(),
                     folder_key,
                 );
-                folder_name_vec.push(deciphered_folder_name);
+                let result = format!("{}:{}", my_folder.owner, deciphered_folder_name);
+                folder_name_vec.push(result);
             }
 
-            let my_choice = self.handle_file_choice(&my_decrypted_filenames);
+            let my_choice = self.handle_file_choice(&file_name_vec, &folder_name_vec, true);
 
-            println!("We will fetch your file, please wait a moment.");
+            if my_choice.1 {
+                // we got a folder -> recursion or go back a folder
+                if my_choice.0 == folder_name_vec.len() {
+                    println!("You chose to go back a folder.");
+                    break; // we go back a folder
+                }
+                // we load choice.0
+                let choice_folder_name_hash =
+                    my_folder.encrypted_folder_names_hash[my_choice.0].as_str();
+                let choice_folder = server.ask_for_folder(choice_folder_name_hash);
+                let decrypted_choice_folder_key = self.decipher_sym_key(
+                    choice_folder.encrypted_folder_key.as_str(),
+                    choice_folder.folder_key_nonce.as_str(),
+                    folder_key,
+                );
 
-            let my_b64_pt_hash =
-                self.get_pt_hash_in_b64(my_decrypted_filenames[my_choice].as_str());
+                // recursion time
+                self.file_and_folder_loop(
+                    server,
+                    choice_folder_name_hash,
+                    &decrypted_choice_folder_key,
+                );
+            } else {
+                // we got a file -> load file
+                // we need to load: my_choice.0
+                let choice_file_name_hash =
+                    my_folder.encrypted_file_names_hash[my_choice.0].as_str();
+                let choice_file = server.ask_for_file(choice_file_name_hash);
 
-            let my_enc_file = server.ask_for_specific_file_with_pt_hash(my_b64_pt_hash.as_str());
+                let my_deciphered_file = self.decipher_sym_text(
+                    choice_file.encrypted_data.as_str(),
+                    choice_file.file_nonce.as_str(),
+                    folder_key,
+                );
+                println!("Here is your file:\n{}", my_deciphered_file);
+            }
 
-            let my_dec_file = self.decrypt_stuff(
-                my_enc_file.encrypted_data.as_str(),
-                my_enc_file.file_salt.as_str(),
-                my_enc_file.file_nonce.as_str(),
-            );
-
-            println!("Here is your file:\n{}", my_dec_file);
         }
     }
 
     /// static method
 
     /**
-     * Is the true main loop once in a root folder
+     * # returns
+     * usize is the index of the file or folder
+     * bool is true if we want a folder
+     * if we can go back a folder then, size + 1 is that option in usize for folder
      */
     fn handle_file_choice(
         &self,
@@ -362,26 +396,102 @@ impl Client {
         decrypted_foldernames: &Vec<String>,
         can_go_back_a_folder: bool, // if true add an option to leave folder
     ) -> (usize, bool) {
-        let mut message = String::from("Select the file you want to read/download.\n");
-        let mut i: usize = 1;
-        for s in decrypted_filenames {
-            message.push_str(format!("{}:\t", i).as_str());
-            message.push_str(s.as_str());
-            message.push_str("\n");
-            i += 1;
-        }
-        message.push_str("Choice: ");
+        let is_folder_chosen: bool;
 
-        let choice: usize = input()
+        println!(
+            "This folder has {} file(s) and {} folder(s)",
+            decrypted_filenames.len(),
+            decrypted_foldernames.len()
+        );
+        if can_go_back_a_folder {
+            println!("You may go back a folder.");
+        }
+
+        if decrypted_filenames.len() == 0 && decrypted_foldernames.len() == 0 {
+            if !can_go_back_a_folder {
+                panic!("Congratulation, root is empty, you found the easter egg)!");
+                // how to disguise a failure into a win
+            }
+            println!("This folder is empty.");
+            return (1, true); // auto go back one folder
+        } else {
+            let mut i:usize=0;
+            println!("Files:");
+            for filename in decrypted_filenames{
+                i+=1;
+                println!("{} # {}",i,filename);
+            }
+            let mut i:usize=0; // thx rust
+            println!("Folders:");
+            for foldername in decrypted_foldernames{
+                i+=1;
+                println!("{} # {}",i,foldername);
+            }
+            if can_go_back_a_folder{
+                i+=1;
+                println!("{} # Go back a folder.",i);
+            }
+        }
+
+        let file_folder: String = input()
+            .repeat_msg("Do you want to select a file or a folder? \n[file/folder]: ")
+            .add_test(|x| *x == "file" || *x == "folder")
+            .get();
+
+        match file_folder.as_str() {
+            "file" => is_folder_chosen = false,
+            "folder" => is_folder_chosen = true, //il y a surement un moyen plus élégant que si oui vrai si non faux
+            _ => panic!("an unexpected answer was given."),
+        }
+
+        if !is_folder_chosen{
+            let mut message = String::from("Select the file you want to read/download.\n");
+
+            let mut i:usize=0;
+            println!("Files:");
+            for filename in decrypted_filenames{
+                i+=1;
+                message.push_str(format!("{} # {}\n",i,filename).as_str());
+            }
+            message.push_str("Choice: ");
+            
+            let choice: usize = input()
             .repeat_msg(message)
             .err(format!(
                 "Please enter a number in the range [1:{}].",
-                (i - 1)
+                i
             ))
-            .add_test(move |x| *x <= (i - 1) && *x != 0)
+            .add_test(move |x| *x <= i && *x != 0)
             .get();
+            println!("Your choice is: {}",choice);
+            return (choice - 1, false);
+        }
+        else { // folder
+            let mut message = String::from("Select the folder you want to go to.\n");
 
-        choice - 1 // :)
+            let mut i:usize=0;
+            println!("Folders:");
+            for foldername in decrypted_foldernames{
+                i+=1;
+                message.push_str(format!("{} # {}\n",i,foldername).as_str());
+            }
+            if can_go_back_a_folder{
+                i+=1;
+                message.push_str(format!("{} # Go back a folder.\n",i).as_str());
+            }
+            message.push_str("Choice: ");
+            
+            let choice: usize = input()
+            .repeat_msg(message)
+            .err(format!(
+                "Please enter a number in the range [1:{}].",
+                i
+            ))
+            .add_test(move |x| *x <= i && *x != 0)
+            .get();
+            println!("Your choice is: {}",choice);
+            return (choice - 1, true);
+        }
     }
     /// static method
     pub fn entrypoint() -> () {
@@ -415,6 +525,6 @@ impl Client {
             }
         }
 
-        client.handle_exchange(connected_server);
+        client.handle_exchange(&connected_server);
     }
 }
