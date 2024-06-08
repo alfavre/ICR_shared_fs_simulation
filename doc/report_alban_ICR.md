@@ -8,8 +8,10 @@ Alban Favre
 
 ### TRUCS
 
-tentative d'eviter le leak de donnée lors ce qu'un mauvais nom d'utilsateur est donnée
-decrypt asym minimum data to avoid losing too much time
+- tentative d'eviter le leak de donnée lors ce qu'un mauvais nom d'utilsateur est donnée
+- decrypt asym minimum data to avoid losing too much time
+- recursion, implementation va mourir si beacoup de fichier imbriqué
+
 
 ### Design
 
