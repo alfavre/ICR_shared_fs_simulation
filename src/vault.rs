@@ -62,6 +62,17 @@ impl Vault {
         }
     }
 
+    pub fn retrieve_salt_for(&self, user_name: String) -> Result<String, &str> {
+        match self
+            .metadata_vec
+            .iter()
+            .find(|metadata| metadata.user_name == user_name)
+        {
+            Some(metadata) => Ok(metadata.master_salt.clone()),
+            None => Err("User not found."),
+        }
+    }
+
     /// as we never change the content, we should never have pbs
     pub fn retrieve_metadata_by_index_value(&self, index: usize) -> Result<&UserMetaData, Error> {
         match self.metadata_vec.get(index) {

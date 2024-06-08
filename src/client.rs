@@ -7,7 +7,9 @@ use sodiumoxide::crypto::*;
 pub struct Client {
     master_password: String,
     username: String,
-    //master_salt: 
+    master_key: Option<[u8;32]>,
+    pk:Option<box_::PublicKey>,
+    sk:Option<box_::SecretKey>,
 }
 
 impl Client {
@@ -15,6 +17,9 @@ impl Client {
         Client {
             master_password: master_password,
             username: username,
+            master_key: None,
+            pk: None,
+            sk: None,
         }
     }
 
@@ -30,6 +35,35 @@ impl Client {
         encode(answer, Variant::UrlSafe)
     }
 
+    fn load_master_key(&mut self,b64_salt: &str, passphrase: &str) -> () {
+
+        let my_salt_slice = decode(b64_salt, Variant::UrlSafe).unwrap();
+        let my_salt = pwhash::Salt::from_slice(&my_salt_slice).unwrap();
+
+        let mut kx = secretbox::Key([0; secretbox::KEYBYTES]);
+        let secretbox::Key(ref mut my_key) = kx;
+        pwhash::derive_key(
+            my_key,                // this is where the result is stored, à la C
+            passphrase.as_bytes(), // we derive passphrase here
+            &my_salt,
+            pwhash::OPSLIMIT_INTERACTIVE,
+            pwhash::MEMLIMIT_INTERACTIVE,
+        ).unwrap();
+         // unwrap just in case we get an error, in which case it should panic
+
+        self.master_key = Some(*my_key);
+    }
+
+    fn load_key_pair(&mut self) -> () {
+        // make key pair from master password
+        let public_key;
+        let secret_key;
+        let box_seed = box_::Seed::from_slice(&self.master_key.expect("master key not yet loaded")).unwrap();
+        (public_key, secret_key) = box_::keypair_from_seed(&box_seed);
+        self.sk = Some(secret_key);
+        self.pk = Some(public_key);
+    }
+
     fn decrypt_stuff(&self, b64_encrypted_text: &str, b64_salt: &str, b64_nonce: &str) -> String {
         let my_salt_slice = decode(b64_salt, Variant::UrlSafe).unwrap();
         let my_salt = pwhash::Salt::from_slice(&my_salt_slice).unwrap();
@@ -37,7 +71,7 @@ impl Client {
         let my_nonce_slice = decode(&b64_nonce, Variant::UrlSafe).unwrap();
         let my_nonce = secretbox::Nonce::from_slice(&my_nonce_slice).unwrap();
 
-        let mut k = secretbox::Key([0; secretbox::KEYBYTES]);
+        let mut k: secretbox::Key = secretbox::Key([0; secretbox::KEYBYTES]);
         let secretbox::Key(ref mut my_key) = k;
         pwhash::derive_key(
             my_key,
@@ -136,15 +170,17 @@ impl Client {
 
         let mut connected_server = Server::connection();
 
-        //let challenge = connected_server.send_challenge();
-        /*
+        let (challenge, key, nonce, salt) = connected_server.send_challenge(username);
+
+        client.load_master_key(salt.as_str(), master_password.as_str());
+
         match connected_server.is_answer_accepted(client.answer_challenge(challenge.as_str())) {
             true => println!("Challenge passed, connection established."),
             false => {
                 println!("Challenge failed, connection has been cut.");
                 return;
             }
-        }*/
+        }
 
         client.handle_exchange(connected_server);
     }

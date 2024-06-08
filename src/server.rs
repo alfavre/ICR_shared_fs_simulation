@@ -10,7 +10,7 @@ use vault::Vault;
 
 pub struct Server {
     vault: Vault,
-    challenge: String,
+    challenge_secret: String,
     client_pk: Option<box_::PublicKey>,
     id: Option<usize>,
     server_pk:box_::PublicKey,
@@ -22,7 +22,7 @@ impl Server {
         let (pk,sk) = crypto::box_::gen_keypair();
         Server {
             vault: Vault::default(),
-            challenge: String::new(),
+            challenge_secret: String::new(),
             client_pk: None,
             id: None,
             server_pk:pk,
@@ -49,16 +49,15 @@ impl Server {
         Server::new()
     }
 
-    pub fn send_challenge(&mut self, username:String) -> (Vec<u8>,box_::PublicKey, box_::Nonce) {
+    pub fn send_challenge(&mut self, username:String) -> (Vec<u8>,box_::PublicKey, box_::Nonce,String) {
         let real_nonce = box_::gen_nonce();
-        let challenge:String = encode(&randombytes(256), Variant::UrlSafe); // im still scared of birthday clowns
-        self.challenge = challenge.clone(); // clone because no time to think
-        let encoded_pk = self.vault.retrieve_public_key_for(username).expect("Failed to retrieve public key");
+        self.challenge_secret = encode(&randombytes(256), Variant::UrlSafe); // im still scared of birthday clowns
+        let encoded_pk = self.vault.retrieve_public_key_for(username.clone()).expect("Failed to retrieve public key");
         self.client_pk = box_::PublicKey::from_slice(&decode(encoded_pk,Variant::UrlSafe).unwrap());
         
-        let challenge = crypto::box_::seal(challenge.as_bytes(), &real_nonce, &self.client_pk.unwrap(), &self.server_sk);
+        let enc_challenge = crypto::box_::seal(self.challenge_secret.as_bytes(), &real_nonce, &self.client_pk.unwrap(), &self.server_sk);
 
-        return (challenge,self.server_pk,real_nonce);
+        return (enc_challenge,self.server_pk,real_nonce,self.vault.retrieve_salt_for(username.clone()).expect("Failed to retrieve salt"));
     }
 
     /*
