@@ -138,6 +138,7 @@ impl Client {
         b64_nonce: &str,
         sym_key: &secretbox::Key,
     ) -> secretbox::Key {
+        println!("salut");
         secretbox::Key::from_slice(&self.decipher_sym_core(b64_encrypted_text, b64_nonce, sym_key))
             .unwrap()
     }
@@ -273,7 +274,6 @@ impl Client {
             // we load root
             let root_name_hash = my_mt.encrypted_root_name_hash.clone();
             let root_folder = server.ask_for_folder(root_name_hash.as_str());
-            
             
             let my_decrypted_root_key = self.decipher_sym_key(
                 root_folder.encrypted_folder_key.as_str(),

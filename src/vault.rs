@@ -681,7 +681,7 @@ impl Vault {
             file_name_nonces: file_name_nonces_z_vec,
             folder_name_nonces: folder_name_nonces_z_vec,
 
-            folder_key_nonce: encode(alban_root_key_nonce, Variant::UrlSafe),
+            folder_key_nonce: encode(zalban_root_key_nonce, Variant::UrlSafe),
         };
 
         //=========================================================================================================
