@@ -6,12 +6,15 @@ use sodiumoxide::crypto::*;
 
 pub struct Client {
     master_password: String,
+    username: String,
+    //master_salt: 
 }
 
 impl Client {
-    fn new(master_password: String) -> Client {
+    fn new(username: String, master_password: String) -> Client {
         Client {
             master_password: master_password,
+            username: username,
         }
     }
 
@@ -64,6 +67,7 @@ impl Client {
     }
 
     fn handle_exchange(&mut self, server: Server) {
+        /*
         println!("We will fetch the list of all your files, please wait a moment.");
 
         let my_metadata = server.ask_for_metadata(); // this will never leave this scope in theory
@@ -96,7 +100,7 @@ impl Client {
             );
 
             println!("Here is your file:\n{}", my_dec_file);
-        }
+        }*/
     }
 
     /// static method
@@ -124,22 +128,23 @@ impl Client {
     }
 
     pub fn entrypoint() -> () {
+        let username: String = input().msg("Please enter your Username.\nUsername: ").get();
         let master_password: String = input().msg("Please enter your password.\nPassword: ").get();
-        let mut client = Client::new(master_password);
+        let mut client = Client::new(username, master_password);
 
         println!("We will now connect to the server. Please wait a moment.");
 
         let mut connected_server = Server::connection();
 
-        let challenge = connected_server.send_challenge();
-
+        //let challenge = connected_server.send_challenge();
+        /*
         match connected_server.is_answer_accepted(client.answer_challenge(challenge.as_str())) {
             true => println!("Challenge passed, connection established."),
             false => {
                 println!("Challenge failed, connection has been cut.");
                 return;
             }
-        }
+        }*/
 
         client.handle_exchange(connected_server);
     }

@@ -1,6 +1,7 @@
 use super::*;
-use file_n_metadata::{EncryptedFile, MetaData};
+use file_n_metadata::{UserEncryptedFolder, UserMetaData,UserEncryptedFile};
 use sodiumoxide::base64::*;
+use sodiumoxide::crypto;
 use sodiumoxide::crypto::*;
 use sodiumoxide::randombytes::randombytes;
 use std::io::{Error, ErrorKind};
@@ -9,19 +10,26 @@ use vault::Vault;
 
 pub struct Server {
     vault: Vault,
-    nonce: String,
+    challenge: String,
+    client_pk: Option<box_::PublicKey>,
     id: Option<usize>,
+    server_pk:box_::PublicKey,
+    server_sk:box_::SecretKey
 }
 
 impl Server {
     fn new() -> Server {
+        let (pk,sk) = crypto::box_::gen_keypair();
         Server {
             vault: Vault::default(),
-            nonce: String::new(),
+            challenge: String::new(),
+            client_pk: None,
             id: None,
+            server_pk:pk,
+            server_sk:sk,
         }
     }
-
+    /*
     fn calculate_all_possible_answers(&self) -> Vec<String> {
         let all_shared_secret = self.vault.retrieve_all_metadata_shared_secret();
         let mut all_responses = Vec::new();
@@ -35,19 +43,26 @@ impl Server {
         }
 
         all_responses
-    }
+    }*/
 
     pub fn connection() -> Server {
         Server::new()
     }
 
-    pub fn send_challenge(&mut self) -> String {
-        let nonce = encode(&randombytes(256), Variant::UrlSafe); // im still scared of birthday clowns
-        self.nonce = nonce.clone(); // clone because no time to think
-        return nonce;
+    pub fn send_challenge(&mut self, username:String) -> (Vec<u8>,box_::PublicKey, box_::Nonce) {
+        let real_nonce = box_::gen_nonce();
+        let challenge:String = encode(&randombytes(256), Variant::UrlSafe); // im still scared of birthday clowns
+        self.challenge = challenge.clone(); // clone because no time to think
+        let encoded_pk = self.vault.retrieve_public_key_for(username).expect("Failed to retrieve public key");
+        self.client_pk = box_::PublicKey::from_slice(&decode(encoded_pk,Variant::UrlSafe).unwrap());
+        
+        let challenge = crypto::box_::seal(challenge.as_bytes(), &real_nonce, &self.client_pk.unwrap(), &self.server_sk);
+
+        return (challenge,self.server_pk,real_nonce);
     }
 
-    pub fn is_answer_accepted(&mut self, answer: String) -> bool {
+    /*
+        pub fn is_answer_accepted(&mut self, answer: String) -> bool {
         match self.verify_challenge_answer(answer) {
             Ok(index) => {
                 self.id = Some(index);
@@ -55,8 +70,8 @@ impl Server {
             }
             Err(_) => return false,
         }
-    }
-
+    }*/
+/*
     fn verify_challenge_answer(&self, answer: String) -> Result<usize, Error> {
         let all_possible_answers = self.calculate_all_possible_answers();
 
@@ -65,8 +80,8 @@ impl Server {
             None => return Err(Error::new(ErrorKind::Other, format!("user doesn't exist"))),
         }
     }
-
-    pub fn ask_for_metadata(&self) -> &MetaData {
+*/
+    pub fn ask_for_metadata(&self) -> &UserMetaData {
         match self
             .vault
             .retrieve_metadata_by_index_value(self.id.unwrap())
@@ -76,7 +91,7 @@ impl Server {
         };
     }
 
-    pub fn ask_for_specific_file_with_pt_hash(&self, b64_pt_hash: &str) -> &EncryptedFile {
+    pub fn ask_for_specific_file_with_pt_hash(&self, b64_pt_hash: &str) -> &UserEncryptedFile {
         match self.vault.retrieve_enc_file_by_b64_hash(b64_pt_hash) {
             Ok(enc_file) => enc_file,
             Err(e) => panic!("plain text hash is wrong somehow, message from above {}", e),
