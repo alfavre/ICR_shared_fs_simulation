@@ -2,8 +2,6 @@ use super::*;
 use file_n_metadata::{UserEncryptedFile, UserEncryptedFolder, UserMetaData};
 use sodiumoxide::base64::*;
 use sodiumoxide::crypto::{box_, hash, pwhash, secretbox};
-//use sodiumoxide::crypto::box_::keypair_from_seed;
-//use sodiumoxide::crypto::box_::curve25519xsalsa20poly1305::{Seed};
 use std::fs::File;
 use std::io::{BufRead, BufReader, Error, ErrorKind, Write};
 
@@ -42,15 +40,6 @@ impl Vault {
         )
     }
 
-    /*
-        pub fn retrieve_all_metadata_shared_secret(&self) -> Vec<String> {
-            let mut shared_secret_vec = Vec::new();
-            for metadata in &self.metadata_vec {
-                shared_secret_vec.push(metadata.shared_secret.clone());
-            }
-            return shared_secret_vec;
-        }
-    */
     pub fn retrieve_public_key_for(&self, user_name: &str) -> Result<String, &str> {
         match self
             .metadata_vec
@@ -73,7 +62,6 @@ impl Vault {
         }
     }
 
-    /// as we never change the content, we should never have pbs
     pub fn retrieve_metadata_for(&self, username: &str) -> Result<&UserMetaData, &str> {
         match self
             .metadata_vec
@@ -83,10 +71,8 @@ impl Vault {
             Some(metadata) => Ok(metadata),
             None => Err("User not found."),
         }
-
     }
 
-    /// as we never change the content, we should never have pbs
     pub fn retrieve_enc_file_by_b64_hash(
         &self,
         b64_hash: &str,
@@ -101,7 +87,6 @@ impl Vault {
         }
     }
 
-    /// as we never change the content, we should never have pbs
     pub fn retrieve_enc_folder_by_b64_hash(
         &self,
         b64_hash: &str,
@@ -245,12 +230,7 @@ impl Vault {
         receiver_pk: &box_::PublicKey,
         sender_sk: &box_::SecretKey,
     ) -> Vec<u8> {
-        return box_::seal(
-            data_to_encrypt,
-            &nonce,
-            receiver_pk,
-            sender_sk,
-        );
+        return box_::seal(data_to_encrypt, &nonce, receiver_pk, sender_sk);
     }
 
     /// Ugly copy pasted code riddled with hard coded values
@@ -260,7 +240,10 @@ impl Vault {
     /// Overwrites the files if not empty
     ///
     pub fn create_default_db() -> () {
-        //init
+        //=========================================================================================================
+        //Initialize vault
+        //=========================================================================================================
+
         let mut my_vault = Vault::new(
             constant::VAULT_METADATA_PATH,
             constant::VAULT_ENCRYPTED_FILE_PATH,
@@ -272,7 +255,7 @@ impl Vault {
         let mut my_enc_folder_vec: Vec<UserEncryptedFolder> = Vec::new();
 
         //=========================================================================================================
-        //=========================================================================================================
+        //Initialize User and their values and their metadata
         //=========================================================================================================
 
         //create the salt for the users
@@ -351,12 +334,8 @@ impl Vault {
             user_public_key: encode(zalban_public_key, Variant::UrlSafe),
         };
 
-        //we push in vec
-        //my_metadata_vec.push(alban_metadata);
-        //my_metadata_vec.push(zalban_metadata);
-
         //=========================================================================================================
-        //=========================================================================================================
+        //Initialize Folder and all their data and metadata (really heavy)
         //=========================================================================================================
 
         // we will now encrypt the data of each file
@@ -699,6 +678,8 @@ impl Vault {
         };
 
         //=========================================================================================================
+        //Initialize File and their data, filenames have already bean generated for folders
+        //=========================================================================================================
 
         let my_file_d = UserEncryptedFile {
             encrypted_file_name_hash: encode(my_file_name_encrypted_hash_d, Variant::UrlSafe), // to identify the file, cypher text hash
@@ -768,20 +749,48 @@ impl Vault {
         my_enc_folder_vec.push(my_folder_f);
         my_enc_folder_vec.push(my_folder_z);
 
+        //=========================================================================================================
+        //We share folder c from alban to zalban, we need to update zalban too
+        //=========================================================================================================
+
         // share c to zalban
         let c_shared_folder_name_nonce = box_::gen_nonce();
         let c_shared_folder_key_nonce = box_::gen_nonce();
-        let asym_encrypted_folder_name_c = Vault::help_encrypt_data_asym(constant::TEST_NAME_TO_ENCRYPT_C.as_bytes(),&c_shared_folder_name_nonce,&zalban_public_key,&alban_secret_key);
-        let asym_encrypted_folder_key_c = Vault::help_encrypt_data_asym(my_folder_key_c.as_ref(),&c_shared_folder_key_nonce,&zalban_public_key,&alban_secret_key);
-        
+        let asym_encrypted_folder_name_c = Vault::help_encrypt_data_asym(
+            constant::TEST_NAME_TO_ENCRYPT_C.as_bytes(),
+            &c_shared_folder_name_nonce,
+            &zalban_public_key,
+            &alban_secret_key,
+        );
+        let asym_encrypted_folder_key_c = Vault::help_encrypt_data_asym(
+            my_folder_key_c.as_ref(),
+            &c_shared_folder_key_nonce,
+            &zalban_public_key,
+            &alban_secret_key,
+        );
+
         //push in zalban metadata
-        zalban_metadata.shared_folder_owner.push(constant::TEST_USERNAME_ALBAN.to_string());
-        zalban_metadata.encrypted_shared_folder_names.push((encode(asym_encrypted_folder_name_c, Variant::UrlSafe),encode(c_shared_folder_name_nonce, Variant::UrlSafe)));
-        zalban_metadata.encrypted_shared_folder_keys.push((encode(asym_encrypted_folder_key_c, Variant::UrlSafe),encode(c_shared_folder_key_nonce, Variant::UrlSafe)));
-        zalban_metadata.shared_folder_names_hash.push(encode(my_folder_name_encrypted_hash_c, Variant::UrlSafe));
+        zalban_metadata
+            .shared_folder_owner
+            .push(constant::TEST_USERNAME_ALBAN.to_string());
+        zalban_metadata.encrypted_shared_folder_names.push((
+            encode(asym_encrypted_folder_name_c, Variant::UrlSafe),
+            encode(c_shared_folder_name_nonce, Variant::UrlSafe),
+        ));
+        zalban_metadata.encrypted_shared_folder_keys.push((
+            encode(asym_encrypted_folder_key_c, Variant::UrlSafe),
+            encode(c_shared_folder_key_nonce, Variant::UrlSafe),
+        ));
+        zalban_metadata
+            .shared_folder_names_hash
+            .push(encode(my_folder_name_encrypted_hash_c, Variant::UrlSafe));
 
         my_metadata_vec.push(alban_metadata);
         my_metadata_vec.push(zalban_metadata);
+
+        //=========================================================================================================
+        //We store everything
+        //=========================================================================================================
 
         my_vault.metadata_vec = my_metadata_vec;
         my_vault.encrypted_files_vec = my_enc_file_vec;
@@ -900,135 +909,4 @@ mod tests {
             constant::TEST_NAME_TO_ENCRYPT_D
         );
     }
-    /*
-    #[test]
-    fn verify_files() {
-        let test_enc_file_vec =
-            Vault::retrieve_all_encrypted_file(constant::VAULT_ENCRYPTED_FILE_PATH);
-
-        // decrypting filenames is pointless :/
-
-        // we have to find all files key
-
-        let mut decrypted_data_vec: Vec<String> = Vec::new();
-        let mut pt_hash_vec = Vec::new();
-
-        for file in test_enc_file_vec {
-            let my_file_hash_slice = decode(file.file_salt, Variant::UrlSafe).unwrap();
-            let my_file_hash = pwhash::Salt::from_slice(&my_file_hash_slice).unwrap();
-
-            let mut k = secretbox::Key([0; secretbox::KEYBYTES]);
-            let secretbox::Key(ref mut my_key) = k;
-            pwhash::derive_key(
-                my_key,
-                constant::TEST_STRONG_PASS.as_bytes(), // we derive master pass here
-                &my_file_hash,
-                pwhash::OPSLIMIT_INTERACTIVE,
-                pwhash::MEMLIMIT_INTERACTIVE,
-            )
-            .unwrap();
-
-            //we have to find xsalsa key
-            let my_key_xsalsa = secretbox::Key::from_slice(my_key).unwrap();
-
-            //we have to retriev the nonce
-            let my_nonce_slice = decode(&file.file_nonce, Variant::UrlSafe).unwrap();
-            let my_nonce = secretbox::Nonce::from_slice(&my_nonce_slice).unwrap();
-
-            let decoded_enc_data = decode(file.encrypted_data, Variant::UrlSafe).unwrap();
-            let my_deciphered_data =
-                secretbox::open(&decoded_enc_data, &my_nonce, &my_key_xsalsa).unwrap();
-            decrypted_data_vec.push(String::from_utf8(my_deciphered_data).unwrap());
-
-            let pt_hash_slice = decode(file.pt_filename_hash, Variant::UrlSafe).unwrap();
-            pt_hash_vec.push(hash::Digest::from_slice(&pt_hash_slice).unwrap());
-        }
-
-        // we get the pt hash
-        let mut hash_state1 = hash::State::new();
-        hash_state1.update(constant::TEST_STRONG_PASS.as_bytes());
-        hash_state1.update(constant::TEST_NAME_TO_ENCRYPT.as_bytes());
-        let digest1 = hash_state1.finalize();
-
-        let mut hash_state2 = hash::State::new();
-        hash_state2.update(constant::TEST_STRONG_PASS.as_bytes());
-        hash_state2.update(constant::TEST_NAME_TO_ENCRYPT_2.as_bytes());
-        let digest2 = hash_state2.finalize();
-
-        let mut hash_state3 = hash::State::new();
-        hash_state3.update(constant::TEST_STRONG_PASS.as_bytes());
-        hash_state3.update(constant::TEST_NAME_TO_ENCRYPT_3.as_bytes());
-        let digest3 = hash_state3.finalize();
-
-        let mut hash_state4 = hash::State::new();
-        hash_state4.update(constant::TEST_STRONG_PASS.as_bytes());
-        hash_state4.update(constant::TEST_NAME_TO_ENCRYPT_4.as_bytes());
-        let digest4 = hash_state4.finalize();
-
-        assert_eq!(pt_hash_vec[0], digest1);
-        assert_eq!(pt_hash_vec[1], digest2);
-        assert_eq!(pt_hash_vec[2], digest3);
-        assert_eq!(pt_hash_vec[3], digest4);
-
-        assert_eq!(decrypted_data_vec[0], constant::TEST_DATA_TO_ENCRYPT);
-        assert_eq!(decrypted_data_vec[1], constant::TEST_DATA_TO_ENCRYPT_2);
-        assert_eq!(decrypted_data_vec[2], constant::TEST_DATA_TO_ENCRYPT_3);
-        assert_eq!(decrypted_data_vec[3], constant::TEST_DATA_TO_ENCRYPT_4);
-    }
-
-    #[test]
-    fn vault_md_retrieval() {
-        let test_vault = Vault::default();
-
-        let test_metad = &test_vault.metadata_vec[0];
-
-        // we have to find master key
-
-        let my_user_salt_slice = decode(&test_metad.user_salt, Variant::UrlSafe).unwrap();
-        let my_user_salt = pwhash::Salt::from_slice(&my_user_salt_slice).unwrap();
-
-        let mut mk = secretbox::Key([0; secretbox::KEYBYTES]);
-        let secretbox::Key(ref mut my_master_key) = mk;
-        pwhash::derive_key(
-            my_master_key,
-            constant::TEST_STRONG_PASS.as_bytes(), // we derive master pass here
-            &my_user_salt,
-            pwhash::OPSLIMIT_INTERACTIVE,
-            pwhash::MEMLIMIT_INTERACTIVE,
-        )
-        .unwrap();
-
-        //we have to find xsalsa key
-        let my_key_xsalsa = secretbox::Key::from_slice(my_master_key).unwrap();
-
-        //we have to retriev the nonce
-        let my_nonce_slice = decode(&test_metad.user_nonce, Variant::UrlSafe).unwrap();
-        let my_nonce = secretbox::Nonce::from_slice(&my_nonce_slice).unwrap();
-
-        // we decrypt to check if it works
-        let mut my_deciphered_test_name_vec: Vec<String> = Vec::new();
-        for enc_name in &test_metad.encrypted_filenames {
-            let decoded_enc_name = decode(enc_name, Variant::UrlSafe).unwrap();
-            let my_deciphered_test_name =
-                secretbox::open(&decoded_enc_name, &my_nonce, &my_key_xsalsa).unwrap();
-            my_deciphered_test_name_vec.push(String::from_utf8(my_deciphered_test_name).unwrap());
-        }
-
-        assert_eq!(
-            my_deciphered_test_name_vec[0],
-            constant::TEST_NAME_TO_ENCRYPT
-        );
-        assert_eq!(
-            my_deciphered_test_name_vec[1],
-            constant::TEST_NAME_TO_ENCRYPT_2
-        );
-        assert_eq!(
-            my_deciphered_test_name_vec[2],
-            constant::TEST_NAME_TO_ENCRYPT_3
-        );
-        assert_eq!(
-            my_deciphered_test_name_vec[3],
-            constant::TEST_NAME_TO_ENCRYPT_4
-        );
-    }*/
 }

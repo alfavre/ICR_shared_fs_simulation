@@ -1,10 +1,7 @@
-use std::sync::mpsc::Receiver;
-
 use super::*;
 use read_input::prelude::*;
 use server::Server;
 use sodiumoxide::base64::*;
-use sodiumoxide::crypto;
 use sodiumoxide::crypto::*;
 
 pub struct Client {
@@ -13,7 +10,6 @@ pub struct Client {
     master_key: Option<[u8; 32]>,
     pk: Option<box_::PublicKey>,
     sk: Option<box_::SecretKey>,
-    current_folder: String, // necessary ?
 }
 
 impl Client {
@@ -24,10 +20,19 @@ impl Client {
             master_key: None,
             pk: None,
             sk: None,
-            current_folder: "\\".to_string(),
         }
     }
 
+    /**
+     * Answer the challenge from the server,
+     * The challenge is super simple:
+     * Please, decipher the message with your public key,
+     * If you are who you prentend to be, then you should have the secret key
+     * The message is also randomized to avoid replay attack.
+     *
+     * For some reason libsodium authenticate the sender, which is cool
+     * This stops the client to talk to unauthorized servers
+     */
     fn answer_challenge(
         &self,
         encrypted_response: Vec<u8>,
@@ -47,6 +52,9 @@ impl Client {
         }
     }
 
+    /**
+     * loads the master key in the client memory on startup
+     */
     fn load_master_key(&mut self, b64_salt: &str) -> () {
         let my_salt_slice = decode(b64_salt, Variant::UrlSafe).unwrap();
         let my_salt = pwhash::Salt::from_slice(&my_salt_slice).unwrap();
@@ -54,8 +62,8 @@ impl Client {
         let mut kx = secretbox::Key([0; secretbox::KEYBYTES]);
         let secretbox::Key(ref mut my_key) = kx;
         pwhash::derive_key(
-            my_key,                          // this is where the result is stored, à la C
-            self.master_password.as_bytes(), // we derive passphrase here
+            my_key, // this is where the result is stored, à la C
+            self.master_password.as_bytes(),
             &my_salt,
             pwhash::OPSLIMIT_INTERACTIVE,
             pwhash::MEMLIMIT_INTERACTIVE,
@@ -66,6 +74,7 @@ impl Client {
         self.master_key = Some(*my_key);
     }
 
+    /// loads the secret and public key in the client memory on startup
     fn load_key_pair(&mut self) -> () {
         // make key pair from master password
         let public_key;
@@ -77,6 +86,10 @@ impl Client {
         self.pk = Some(public_key);
     }
 
+    /**
+     * Used to decipher shared foldernames with the folder key
+     * Slow because asym crypto
+     */
     fn decipher_asym_text(
         &self,
         b64_encrypted_text: &str,
@@ -87,6 +100,10 @@ impl Client {
             .unwrap()
     }
 
+    /**
+     * Used to decypher the shared folder key with the secret key (not master key)
+     * Slow because asym crypto
+     */
     fn decipher_asym_key(
         &self,
         b64_encrypted_text: &str,
@@ -122,7 +139,10 @@ impl Client {
 
         return deciphered_stuff;
     }
-
+    /**
+     * Used to decipher filenames and foldernames with the folder key
+     * the root folder name is deciphered with the master key instead
+     */
     fn decipher_sym_text(
         &self,
         b64_encrypted_text: &str,
@@ -132,13 +152,16 @@ impl Client {
         String::from_utf8(self.decipher_sym_core(b64_encrypted_text, b64_nonce, sym_key)).unwrap()
     }
 
+    /**
+     * Used to decipher the folder key with the -1 folder key
+     * for the root folder the -1 folder key is the master key
+     */
     fn decipher_sym_key(
         &self,
         b64_encrypted_text: &str,
         b64_nonce: &str,
         sym_key: &secretbox::Key,
     ) -> secretbox::Key {
-        println!("salut");
         secretbox::Key::from_slice(&self.decipher_sym_core(b64_encrypted_text, b64_nonce, sym_key))
             .unwrap()
     }
@@ -159,46 +182,26 @@ impl Client {
         let decoded_stuff = decode(b64_encrypted_text, Variant::UrlSafe).unwrap();
         let my_deciphered_stuff = secretbox::open(&decoded_stuff, &my_nonce, sym_key).unwrap();
 
-        //String::from_utf8(my_deciphered_stuff).unwrap()
         return my_deciphered_stuff;
     }
-    /*
-    fn decrypt_stuff(&self, b64_encrypted_text: &str, b64_salt: &str, b64_nonce: &str) -> String {
-        let my_salt_slice = decode(b64_salt, Variant::UrlSafe).unwrap();
-        let my_salt = pwhash::Salt::from_slice(&my_salt_slice).unwrap();
 
-        let my_nonce_slice = decode(&b64_nonce, Variant::UrlSafe).unwrap();
-        let my_nonce = secretbox::Nonce::from_slice(&my_nonce_slice).unwrap();
-
-        let mut k: secretbox::Key = secretbox::Key([0; secretbox::KEYBYTES]);
-        let secretbox::Key(ref mut my_key) = k;
-        pwhash::derive_key(
-            my_key,
-            self.master_password.as_bytes(), // we derive master pass here
-            &my_salt,
-            pwhash::OPSLIMIT_INTERACTIVE,
-            pwhash::MEMLIMIT_INTERACTIVE,
-        )
-        .unwrap();
-
-        let my_key_xsalsa = secretbox::Key::from_slice(my_key).unwrap();
-
-        let decoded_stuff = decode(b64_encrypted_text, Variant::UrlSafe).unwrap();
-        let my_deciphered_stuff =
-            secretbox::open(&decoded_stuff, &my_nonce, &my_key_xsalsa).unwrap();
-
-        String::from_utf8(my_deciphered_stuff).unwrap()
-    }*/
-
-    /*
-    fn get_pt_hash_in_b64(&self, pt_filename: &str) -> String {
+    /**
+     * Unused, Is the implementation to get the hash from an encrypted filename/foldername
+     * consider calling this when adding a file/foler from the client
+     */
+    fn get_hash_in_b64(&self, encrypted_filename: &str) -> String {
         let mut hash_state = hash::State::new();
-        hash_state.update(self.master_password.as_bytes());
-        hash_state.update(pt_filename.as_bytes());
+        hash_state.update(encrypted_filename.as_bytes());
         let digest = hash_state.finalize();
         encode(digest, Variant::UrlSafe)
-    }*/
+    }
 
+    /**
+     * Complicated, manages the start of the normal behavior
+     * It asks if the user wants to look at shared folders or root folders
+     * then decrypts either the shared foldernames or root name
+     * it then asks which folder to jump to, decrypts it's key and jump by hash name
+     */
     fn handle_exchange(&self, server: &Server) {
         println!("We will fetch the list of all your files and folders, please wait a moment.");
         let my_mt = server.ask_for_metadata(self.username.as_str()); // this will never leave this scope in theory
@@ -232,6 +235,9 @@ impl Client {
                 "no" | "n" => is_shared = false, //il y a surement un moyen plus élégant que si oui vrai si non faux
                 _ => panic!("an unexpected answer was given."),
             }
+            println!(
+                "\n---------------------------------------------------------------------------\n\n"
+            );
         } else {
             is_shared = false;
         }
@@ -284,18 +290,6 @@ impl Client {
             folder_hash_and_key = (root_name_hash, my_decrypted_root_key);
         }
 
-        //let mut my_decrypted_filenames: Vec<String> = Vec::new();
-
-        /*
-        for encrypted_filename in &my_mt.encrypted_filenames {
-            // this is really badly optimised, as key, nonce and salt have to be retrieved each time
-            my_decrypted_filenames.push(self.decrypt_stuff(
-                encrypted_filename,
-                my_mt.user_salt.as_str(),
-                my_mt.user_nonce.as_str(),
-            ))
-        }*/
-
         self.file_and_folder_loop(
             server,
             folder_hash_and_key.0.as_str(),
@@ -303,8 +297,11 @@ impl Client {
         );
         println!("You escaped the recursion, good job, the program will now stop normally.");
     }
+
     /**
-     * Is the true main loop once in a root folder
+     * The defaul loop once in a folder
+     * decrpyts names, asks what to look, decrypts data
+     * jumps to next folder if necessary by calling itself (recursion)
      */
     fn file_and_folder_loop(
         &self,
@@ -380,8 +377,6 @@ impl Client {
         }
     }
 
-    /// static method
-
     /**
      * # returns
      * usize is the index of the file or folder
@@ -396,52 +391,64 @@ impl Client {
     ) -> (usize, bool) {
         let is_folder_chosen: bool;
 
-        println!(
-            "This folder has {} file(s) and {} folder(s)",
-            decrypted_filenames.len(),
-            decrypted_foldernames.len()
-        );
         if can_go_back_a_folder {
+            println!(
+                "This folder has {} file(s) and {} folder(s)",
+                decrypted_filenames.len(),
+                decrypted_foldernames.len()
+            );
             println!("You may go back a folder.");
+        } else {
+            println!("You have {} shared folder(s)", decrypted_foldernames.len());
         }
 
-        if decrypted_filenames.len() == 0 && decrypted_foldernames.len() == 0 {
+        if decrypted_filenames.is_empty() && decrypted_foldernames.is_empty() {
             if !can_go_back_a_folder {
-                panic!("Congratulation, root is empty, you found the easter egg)!");
-                // how to disguise a failure into a win
+                println!("Congratulation, root is empty, you found the easter egg)!");
+                std::process::exit(1);
             }
             println!("This folder is empty.");
             return (1, true); // auto go back one folder
         } else {
             let mut i: usize = 0;
-            if decrypted_filenames.len() != 0 {
+            if !decrypted_filenames.is_empty() {
                 println!("Files:");
                 for filename in decrypted_filenames {
                     i += 1;
                     println!("{} # {}", i, filename);
                 }
-            } // todo other stuff here
-            let mut i: usize = 0; // thx rust
-            println!("Folders:");
-            for foldername in decrypted_foldernames {
-                i += 1;
-                println!("{} # {}", i, foldername);
+                i = 0;
             }
             if can_go_back_a_folder {
+                println!("Folders:");
+
+                if !decrypted_foldernames.is_empty() {
+                    for foldername in decrypted_foldernames {
+                        i += 1;
+                        println!("{} # {}", i, foldername);
+                    }
+                }
                 i += 1;
                 println!("{} # Go back a folder.", i);
             }
         }
 
-        let file_folder: String = input()
-            .repeat_msg("Do you want to select a file or a folder? \n[file/folder]: ")
-            .add_test(|x| *x == "file" || *x == "folder")
-            .get();
+        if decrypted_filenames.is_empty() {
+            is_folder_chosen = true;
+        } else {
+            let file_folder: String = input()
+                .repeat_msg("Do you want to select a file or a folder? \n[file/folder]: ")
+                .add_test(|x| *x == "file" || *x == "folder")
+                .get();
 
-        match file_folder.as_str() {
-            "file" => is_folder_chosen = false,
-            "folder" => is_folder_chosen = true, //il y a surement un moyen plus élégant que si oui vrai si non faux
-            _ => panic!("an unexpected answer was given."),
+            match file_folder.as_str() {
+                "file" => is_folder_chosen = false,
+                "folder" => is_folder_chosen = true, //il y a surement un moyen plus élégant que si oui vrai si non faux
+                _ => panic!("an unexpected answer was given."),
+            }
+            println!(
+                "\n---------------------------------------------------------------------------\n\n"
+            );
         }
 
         if !is_folder_chosen {
@@ -461,13 +468,19 @@ impl Client {
                 .add_test(move |x| *x <= i && *x != 0)
                 .get();
             println!("Your choice is: {}", choice);
+            println!(
+                "\n---------------------------------------------------------------------------\n\n"
+            );
+
             return (choice - 1, false);
         } else {
             // folder
             let mut message = String::from("Select the folder you want to go to.\n");
 
             let mut i: usize = 0;
-            println!("Folders:");
+            if can_go_back_a_folder {
+                println!("Folders:");
+            }
             for foldername in decrypted_foldernames {
                 i += 1;
                 message.push_str(format!("{} # {}\n", i, foldername).as_str());
@@ -484,9 +497,14 @@ impl Client {
                 .add_test(move |x| *x <= i && *x != 0)
                 .get();
             println!("Your choice is: {}", choice);
+            println!(
+                "\n---------------------------------------------------------------------------\n\n"
+            );
+
             return (choice - 1, true);
         }
     }
+
     /// static method
     pub fn entrypoint() -> () {
         let username: String = input().msg("Please enter your Username.\nUsername: ").get();
