@@ -239,6 +239,20 @@ impl Vault {
         return secretbox::seal(to_bytes, nonce, xsalsa_key);
     }
 
+    fn help_encrypt_data_asym(
+        data_to_encrypt: &[u8],
+        nonce: &box_::Nonce,
+        receiver_pk: &box_::PublicKey,
+        sender_sk: &box_::SecretKey,
+    ) -> Vec<u8> {
+        return box_::seal(
+            data_to_encrypt,
+            &nonce,
+            receiver_pk,
+            sender_sk,
+        );
+    }
+
     /// Ugly copy pasted code riddled with hard coded values
     ///
     /// Generates the default data
@@ -322,7 +336,7 @@ impl Vault {
         };
 
         // we fill our struct for db
-        let zalban_metadata = UserMetaData {
+        let mut zalban_metadata = UserMetaData {
             user_name: String::from(constant::TEST_USERNAME_ZALBAN),
             encrypted_root_name_hash: encode(encrypted_folder_name_hash_z, Variant::UrlSafe),
             encrypted_root_name: encode(root_folder_name_encrypted_z, Variant::UrlSafe),
@@ -338,8 +352,8 @@ impl Vault {
         };
 
         //we push in vec
-        my_metadata_vec.push(alban_metadata);
-        my_metadata_vec.push(zalban_metadata);
+        //my_metadata_vec.push(alban_metadata);
+        //my_metadata_vec.push(zalban_metadata);
 
         //=========================================================================================================
         //=========================================================================================================
@@ -753,6 +767,21 @@ impl Vault {
         my_enc_folder_vec.push(my_folder_c);
         my_enc_folder_vec.push(my_folder_f);
         my_enc_folder_vec.push(my_folder_z);
+
+        // share c to zalban
+        let c_shared_folder_name_nonce = box_::gen_nonce();
+        let c_shared_folder_key_nonce = box_::gen_nonce();
+        let asym_encrypted_folder_name_c = Vault::help_encrypt_data_asym(constant::TEST_NAME_TO_ENCRYPT_C.as_bytes(),&c_shared_folder_name_nonce,&zalban_public_key,&alban_secret_key);
+        let asym_encrypted_folder_key_c = Vault::help_encrypt_data_asym(my_folder_key_c.as_ref(),&c_shared_folder_key_nonce,&zalban_public_key,&alban_secret_key);
+        
+        //push in zalban metadata
+        zalban_metadata.shared_folder_owner.push(constant::TEST_USERNAME_ALBAN.to_string());
+        zalban_metadata.encrypted_shared_folder_names.push((encode(asym_encrypted_folder_name_c, Variant::UrlSafe),encode(c_shared_folder_name_nonce, Variant::UrlSafe)));
+        zalban_metadata.encrypted_shared_folder_keys.push((encode(asym_encrypted_folder_key_c, Variant::UrlSafe),encode(c_shared_folder_key_nonce, Variant::UrlSafe)));
+        zalban_metadata.shared_folder_names_hash.push(encode(my_folder_name_encrypted_hash_c, Variant::UrlSafe));
+
+        my_metadata_vec.push(alban_metadata);
+        my_metadata_vec.push(zalban_metadata);
 
         my_vault.metadata_vec = my_metadata_vec;
         my_vault.encrypted_files_vec = my_enc_file_vec;

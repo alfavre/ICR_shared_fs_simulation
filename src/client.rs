@@ -204,7 +204,7 @@ impl Client {
         let my_mt = server.ask_for_metadata(self.username.as_str()); // this will never leave this scope in theory
         let folder_hash_and_key: (String, secretbox::Key);
 
-        let mut my_decrypted_root_name = self.decipher_sym_text(
+        let my_decrypted_root_name = self.decipher_sym_text(
             my_mt.encrypted_root_name.as_str(),
             my_mt.root_name_nonce.as_str(),
             &Client::to_sym_key(&self.master_key.unwrap()),
@@ -263,7 +263,7 @@ impl Client {
                 panic!("imposible choice!");
             }
             let owner_pk = server.ask_for_public_key(my_mt.shared_folder_owner[index].as_str());
-            let mut decrypted_shared_keys = self.decipher_asym_key(
+            let decrypted_shared_keys = self.decipher_asym_key(
                 my_mt.encrypted_shared_folder_keys[index].0.as_str(),
                 &owner_pk,
                 my_mt.encrypted_shared_folder_keys[index].1.as_str(),
@@ -274,7 +274,7 @@ impl Client {
             // we load root
             let root_name_hash = my_mt.encrypted_root_name_hash.clone();
             let root_folder = server.ask_for_folder(root_name_hash.as_str());
-            
+
             let my_decrypted_root_key = self.decipher_sym_key(
                 root_folder.encrypted_folder_key.as_str(),
                 root_folder.folder_key_nonce.as_str(),
@@ -314,7 +314,6 @@ impl Client {
     ) {
         let my_folder = server.ask_for_folder(folder_hash);
         loop {
-
             println!("");
             println!("");
 
@@ -378,7 +377,6 @@ impl Client {
                 );
                 println!("Here is your file:\n{}", my_deciphered_file);
             }
-
         }
     }
 
@@ -415,21 +413,23 @@ impl Client {
             println!("This folder is empty.");
             return (1, true); // auto go back one folder
         } else {
-            let mut i:usize=0;
-            println!("Files:");
-            for filename in decrypted_filenames{
-                i+=1;
-                println!("{} # {}",i,filename);
-            }
-            let mut i:usize=0; // thx rust
+            let mut i: usize = 0;
+            if decrypted_filenames.len() != 0 {
+                println!("Files:");
+                for filename in decrypted_filenames {
+                    i += 1;
+                    println!("{} # {}", i, filename);
+                }
+            } // todo other stuff here
+            let mut i: usize = 0; // thx rust
             println!("Folders:");
-            for foldername in decrypted_foldernames{
-                i+=1;
-                println!("{} # {}",i,foldername);
+            for foldername in decrypted_foldernames {
+                i += 1;
+                println!("{} # {}", i, foldername);
             }
-            if can_go_back_a_folder{
-                i+=1;
-                println!("{} # Go back a folder.",i);
+            if can_go_back_a_folder {
+                i += 1;
+                println!("{} # Go back a folder.", i);
             }
         }
 
@@ -444,52 +444,46 @@ impl Client {
             _ => panic!("an unexpected answer was given."),
         }
 
-        if !is_folder_chosen{
+        if !is_folder_chosen {
             let mut message = String::from("Select the file you want to read/download.\n");
 
-            let mut i:usize=0;
+            let mut i: usize = 0;
             println!("Files:");
-            for filename in decrypted_filenames{
-                i+=1;
-                message.push_str(format!("{} # {}\n",i,filename).as_str());
+            for filename in decrypted_filenames {
+                i += 1;
+                message.push_str(format!("{} # {}\n", i, filename).as_str());
             }
             message.push_str("Choice: ");
-            
+
             let choice: usize = input()
-            .repeat_msg(message)
-            .err(format!(
-                "Please enter a number in the range [1:{}].",
-                i
-            ))
-            .add_test(move |x| *x <= i && *x != 0)
-            .get();
-            println!("Your choice is: {}",choice);
+                .repeat_msg(message)
+                .err(format!("Please enter a number in the range [1:{}].", i))
+                .add_test(move |x| *x <= i && *x != 0)
+                .get();
+            println!("Your choice is: {}", choice);
             return (choice - 1, false);
-        }
-        else { // folder
+        } else {
+            // folder
             let mut message = String::from("Select the folder you want to go to.\n");
 
-            let mut i:usize=0;
+            let mut i: usize = 0;
             println!("Folders:");
-            for foldername in decrypted_foldernames{
-                i+=1;
-                message.push_str(format!("{} # {}\n",i,foldername).as_str());
+            for foldername in decrypted_foldernames {
+                i += 1;
+                message.push_str(format!("{} # {}\n", i, foldername).as_str());
             }
-            if can_go_back_a_folder{
-                i+=1;
-                message.push_str(format!("{} # Go back a folder.\n",i).as_str());
+            if can_go_back_a_folder {
+                i += 1;
+                message.push_str(format!("{} # Go back a folder.\n", i).as_str());
             }
             message.push_str("Choice: ");
-            
+
             let choice: usize = input()
-            .repeat_msg(message)
-            .err(format!(
-                "Please enter a number in the range [1:{}].",
-                i
-            ))
-            .add_test(move |x| *x <= i && *x != 0)
-            .get();
-            println!("Your choice is: {}",choice);
+                .repeat_msg(message)
+                .err(format!("Please enter a number in the range [1:{}].", i))
+                .add_test(move |x| *x <= i && *x != 0)
+                .get();
+            println!("Your choice is: {}", choice);
             return (choice - 1, true);
         }
     }

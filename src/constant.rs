@@ -8,11 +8,11 @@ pub const TEST_USERNAME_ZALBAN: &'static str = "Zalban";
 pub const TEST_STRONG_PASS_ALBAN: &'static str = "4KL7g#.7c,HMPRrZ"; // this password has been generated with an online tool, don't use it as a real password
 pub const TEST_STRONG_PASS_ZALBAN: &'static str = "a3GoTuAZ"; // generated with duckduckgo, he just does it when you search for "generate password"
 
-pub const TEST_NAME_TO_ENCRYPT_A: &'static str = "LA ROUTE!";
-pub const TEST_NAME_TO_ENCRYPT_B: &'static str = "etc";
-pub const TEST_NAME_TO_ENCRYPT_C: &'static str = "home";
-pub const TEST_NAME_TO_ENCRYPT_F: &'static str = "alban";
-pub const TEST_NAME_TO_ENCRYPT_Z: &'static str = "roooooooooooooooooooooooooooooooooot";
+pub const TEST_NAME_TO_ENCRYPT_A: &'static str = "aroot";
+pub const TEST_NAME_TO_ENCRYPT_B: &'static str = "bureau";
+pub const TEST_NAME_TO_ENCRYPT_C: &'static str = "captures";
+pub const TEST_NAME_TO_ENCRYPT_F: &'static str = "fotos";
+pub const TEST_NAME_TO_ENCRYPT_Z: &'static str = "zroot";
 
 pub const TEST_NAME_TO_ENCRYPT_D: &'static str = "Data.docx";
 pub const TEST_DATA_TO_ENCRYPT_D: &'static str =
