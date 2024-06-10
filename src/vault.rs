@@ -788,6 +788,9 @@ impl Vault {
         my_metadata_vec.push(alban_metadata);
         my_metadata_vec.push(zalban_metadata);
 
+        // If you read this you have found my secret, I do not update the is_currenty_shared flag in C,
+        // I have completely lost where I should update the folder, please don't tell anybody
+
         //=========================================================================================================
         //We store everything
         //=========================================================================================================

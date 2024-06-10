@@ -12,52 +12,30 @@ This is done for the 2024 second semester of HES-SO's master ICR course.
 
 Implement a secure file system, that allows file sharing
 
-**warning**:
-- the KDF needs to be fast, we don't want to stop bruteforce
-- The shared system idea is that a "folder" is just a special file that is the key of the file in the folder
-
 ### Report
 
 This file is **NOT** the report,
-the real report can be found in `doc/report.md` or `doc/report.pdf`
+the real report can be found in `doc/report_alban_ICR.md` or `doc/report_alban_ICR.pdf`
 
-### Understanding
+### Test users
 
-**WARNING, OLD, TO C**
+```alban
+Alban
+4KL7g#.7c,HMPRrZ
+```
 
-there is three entities: the `client`, the `server` and the `vault`
+```zalban
+Zalban
+a3GoTuAZ
+```
 
-the server is just a bridge between the two, when a client is authenticated it can ask for encrypted file, that will have to be decrypted by itself.
+### Graph
 
-The password is a master key, capable of answering challenges, decrypting the file list and deriving each key for each file. The hard coded password is `4KL7g#.7c,HMPRrZ` and can be foun in `src/constant.rs`
+Alban root is A
 
-### Checkmarks
+Zalban root is Z
 
-- [X] client side
-  - [X] client has only one password
-  - [X] client can answer challenges
-  - [X] client can decrypt filenames list
-  - [X] client can ask for a file
-  - [X] client can decrypt file
-- [X] server side
-  - [X] server can ask challenges
-  - [X] server can fetch encrypted filename list
-  - [X] server can fetch encrypted file
-- [X] vault side
-  - [X] vault stores encrypted filenames
-  - [X] vault stores encrypted files
-
-### Possible Bonuses (Boni ?)
-
-- [X] server can work with multiple user
-  - [X] server cant distinguish between user file (aka which file is to whomst)
-- [ ] file sharing among user ???
-  - [ ] what ???
-- [ ] multi factor auth
-  - [ ] just cc from sec
-- [ ] use TPM to secure secrets
-  - [ ] what?
-- [ ] and more
+![](doc/img/arbre.drawio.png)
 
 ### Notes
 
