@@ -46,7 +46,7 @@ Zalban root is Z
 
 Everything will be simulated (database, server, communications)
 
-### Help for my poor brain
+### Rust
 
 ```rust
     pub fn slice_to_string(slice: &[u8]) -> String {
